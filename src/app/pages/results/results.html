@@ -1,0 +1,156 @@
+<div class="results-scroll">
+  <div class="results-container">
+
+    <!-- Top -->
+    <header class="results-top" appParallax [parallaxStrength]="3">
+      <a class="back-link interactive" routerLink="/setup">← Your field</a>
+      <div class="view-toggle" role="tablist">
+        <button class="interactive" [class.active]="view() === 'farmer'" (click)="view.set('farmer')">Farmer</button>
+        <button class="interactive" [class.active]="view() === 'agronomist'" (click)="view.set('agronomist')">Agronomist</button>
+      </div>
+    </header>
+
+    @if (loading()) {
+      <div class="loading-card glass">
+        <span class="spinner"></span> Analyzing 45 years of NASA data…
+      </div>
+    } @else if (result(); as r) {
+      <h1 class="headline">
+        Best window to plant <span class="crop">{{ cropLabel() }}</span> this year:
+        <span class="gradient-text range">{{ headlineRange() }}</span>
+      </h1>
+
+      <div class="cards" appEnter [enterStagger]="0.1">
+
+        <!-- CARD 1 — Year calendar -->
+        <section class="card glass enter-item">
+          <div class="card-head">
+            <h2>Year calendar · {{ currentYear }}</h2>
+            <span class="opt-label">Optimal window: {{ headlineRange() }}</span>
+          </div>
+
+          <div class="bar">
+            <div class="bracket" [style.left.%]="bracket().left" [style.width.%]="bracket().width"></div>
+            @if (usualLeft() >= 0) {
+              <div class="usual-line" [style.left.%]="usualLeft()"><span>Your usual date</span></div>
+            }
+            @for (c of calendar(); track c.month) {
+              <div class="col">
+                <div class="cell" [class.tall]="c.tall" [style.background]="c.color"></div>
+                <span class="m-label">{{ c.label }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="legend">
+            <span class="sw"><i style="background:#2D6B44"></i> safe</span>
+            <span class="sw"><i style="background:#49E07B"></i> optimal</span>
+            <span class="sw"><i style="background:#8FD6A6"></i> flowering (sensitive)</span>
+            <span class="sw"><i style="background:#F2B347"></i> heat risk</span>
+            <span class="sw"><i style="background:#8FB8E8"></i> frost risk</span>
+          </div>
+        </section>
+
+        <!-- CARD 2 — Time machine -->
+        <section class="card timemachine enter-item">
+          <h2>Time machine — the window is drifting</h2>
+          <p class="sub">Drag the slider and watch your best planting date shift with the climate.</p>
+
+          <input class="year-slider interactive" type="range" min="2001" max="2050" step="1"
+                 [value]="sliderYear()" (input)="onYear($any($event.target).value)" />
+          <div class="slider-labels">
+            <span>2001</span><span>Today</span><span class="amber">2050</span>
+          </div>
+
+          <div class="tm-readout">
+            <div class="tm-block">
+              <span class="tm-cap">Best planting window in {{ sliderYear() }}</span>
+              <span class="tm-val gradient-text">{{ interpDay() | windowDayToDate }}</span>
+            </div>
+            <div class="tm-block">
+              <span class="tm-cap">Compared to 2001</span>
+              <span class="tm-val" [class]="driftClass()">{{ drift() > 0 ? '+' + drift() + ' days later' : 'same' }}</span>
+            </div>
+          </div>
+
+          <button class="btn amber-btn interactive" (click)="jumpTo2050()">Jump to 2050 →</button>
+
+          <p class="drift-stmt" [class]="driftClass()">
+            The optimal planting date has shifted {{ drift() }} days later since 2001.
+          </p>
+        </section>
+
+        <!-- CARD 3 — Irrigation -->
+        <section class="card glass enter-item">
+          <h2>Irrigation window</h2>
+          <p class="sub">Weeks your crop actually needs water.</p>
+          <div class="bar">
+            @for (c of irrigation(); track c.month) {
+              <div class="col">
+                <div class="cell" [style.background]="c.color"></div>
+                <span class="m-label">{{ c.label }}</span>
+              </div>
+            }
+          </div>
+          <div class="legend">
+            <span class="sw"><i style="background:#7FB0D4"></i> Irrigation needed</span>
+            <span class="sw"><i style="background:rgba(127,176,212,0.3)"></i> Rain usually enough</span>
+            <span class="sw"><i style="background:rgba(255,255,255,0.06)"></i> Off season</span>
+          </div>
+          <p class="foot-note muted">Based on FAO-56 crop water requirements + NASA SMAP soil moisture.</p>
+        </section>
+
+        <!-- CARD 4 — Evidence -->
+        <section class="card glass evidence enter-item">
+          <div class="ev-grid">
+            <div class="ev-col">
+              <h3>Why this window</h3>
+              <p class="why">{{ r.evidence.why }}</p>
+              <span class="chip source"><span class="sat">🛰️</span> {{ r.evidence.nasaSource }}</span>
+              <div class="confidence" [class]="r.evidence.confidence">
+                <span class="dot"></span> {{ confidenceLabel() }}
+              </div>
+            </div>
+
+            <div class="ev-col">
+              <h3>Needs local review</h3>
+              <ul class="review-list">
+                @for (p of reviewPoints; track p) {
+                  <li><span class="warn">⚠️</span> {{ p }}</li>
+                }
+              </ul>
+            </div>
+          </div>
+
+          @if (view() === 'agronomist') {
+            <div class="gdd-panel">
+              <h4>GDD accumulation · growing degree days</h4>
+              <svg viewBox="0 0 560 170" class="gdd-chart" preserveAspectRatio="none">
+                <line x1="4" y1="150" x2="556" y2="150" stroke="rgba(159,179,166,0.3)" />
+                @for (s of gddStages; track s.label) {
+                  <line [attr.x1]="gddX(s.idx)" y1="12" [attr.x2]="gddX(s.idx)" y2="150"
+                        stroke="rgba(242,179,71,0.45)" stroke-dasharray="3 3" />
+                  <text [attr.x]="gddX(s.idx)" y="9" class="stage-label">{{ s.label }}</text>
+                }
+                <path [attr.d]="gddPath()" fill="none" stroke="#49E07B" stroke-width="2.5" />
+                @for (lbl of ['Oct','Dec','Feb','Apr','Jun','Aug']; track lbl; let i = $index) {
+                  <text [attr.x]="gddX(i * 2)" y="166" class="axis-label">{{ lbl }}</text>
+                }
+              </svg>
+              <span class="chip source small"><span class="sat">🛰️</span> NASA POWER T2M · GDD base 0 °C</span>
+            </div>
+          }
+        </section>
+      </div>
+
+      <!-- CTA -->
+      <div class="cta-row enter-item">
+        <button class="btn btn-ghost interactive" (click)="toAgronomist()">Send to agronomist for review</button>
+        <button class="btn interactive" disabled title="Available after agronomist review">Download as PDF</button>
+      </div>
+      <p class="disclaimer muted">
+        This is timing guidance only. Consult your agronomist and local field conditions before planting.
+      </p>
+    }
+  </div>
+</div>

@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { fieldSelectedGuard } from './core/field.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'field' },
@@ -13,7 +14,12 @@ export const routes: Routes = [
   },
   {
     path: 'results',
+    canActivate: [fieldSelectedGuard],
     loadComponent: () => import('./pages/results/results').then((m) => m.ResultsComponent),
+  },
+  {
+    path: 'agronomist',
+    loadComponent: () => import('./pages/agronomist/agronomist').then((m) => m.AgronomistComponent),
   },
   { path: '**', redirectTo: 'field' },
 ];

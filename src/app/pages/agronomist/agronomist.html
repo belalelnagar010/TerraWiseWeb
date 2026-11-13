@@ -1,0 +1,175 @@
+@if (!authed()) {
+  <!-- Access gate -->
+  <div class="gate">
+    <div class="gate-card glass" appEnter>
+      <span class="gate-logo enter-item">
+        <svg viewBox="0 0 24 24" width="30" height="30">
+          <path d="M12 21c0-5 2.5-8.5 7-10-1 5-2.5 8.5-7 10zM12 21c0-5-2.5-8.5-7-10 1 5 2.5 8.5 7 10z" fill="#49E07B"/>
+          <path d="M12 22V10" stroke="#49E07B" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <h1 class="enter-item">Agronomist access</h1>
+      <p class="muted enter-item">Enter your agronomist code to open the extension dashboard.</p>
+      <input class="gate-input interactive enter-item" [value]="code()"
+             (input)="code.set($any($event.target).value)"
+             (keydown.enter)="submitCode()" placeholder="Agronomist code" />
+      <button class="btn gate-btn interactive enter-item" [disabled]="!code().trim()" (click)="submitCode()">
+        Access dashboard
+      </button>
+    </div>
+  </div>
+} @else {
+  <div class="dash">
+    <div class="dim-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar glass">
+      <div class="side-brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" width="22" height="22">
+            <path d="M12 21c0-5 2.5-8.5 7-10-1 5-2.5 8.5-7 10zM12 21c0-5-2.5-8.5-7-10 1 5 2.5 8.5 7 10z" fill="#49E07B"/>
+            <path d="M12 22V10" stroke="#49E07B" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="brand-name">Terra<span>Wise</span></span>
+      </div>
+
+      <nav class="side-nav">
+        <a class="nav-item active interactive">🌾 Farmer requests <span class="nav-badge">{{ unreviewedCount() }}</span></a>
+        <a class="nav-item interactive">🗺️ Area map</a>
+        <a class="nav-item interactive">📋 Local rules</a>
+        <a class="nav-item interactive">📊 Season log</a>
+      </nav>
+
+      <button class="side-foot interactive" (click)="toFarmerView()">Farmer view →</button>
+    </aside>
+
+    <!-- Main -->
+    <main class="dash-main">
+      <!-- KPIs -->
+      <div class="kpi-row" appEnter [enterStagger]="0.07">
+        @for (k of kpis(); track k.label) {
+          <div class="kpi glass enter-item">
+            <span class="kpi-val" [class.amber]="k.amber">{{ k.value }}</span>
+            <span class="kpi-label muted">{{ k.label }}</span>
+          </div>
+        }
+      </div>
+
+      <!-- Farmer requests -->
+      <section class="panel glass">
+        <h2>Farmer requests</h2>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Farmer</th><th>Crop</th><th>Suggested window</th><th>Usual date</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              @for (f of farmers(); track f.name) {
+                <tr>
+                  <td class="strong">{{ f.name }}</td>
+                  <td>{{ f.crop }}</td>
+                  <td class="green">{{ f.window }}</td>
+                  <td class="muted">{{ f.usual }}</td>
+                  <td><span class="chip" [class.amber]="f.status === 'late'">{{ f.status === 'late' ? 'Planting late' : 'On track' }}</span></td>
+                  <td>
+                    @if (f.reviewed) {
+                      <span class="approved">✓ Approved</span>
+                    } @else {
+                      <button class="mini-btn interactive" (click)="openReview(f)">Review</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Area map -->
+      <section class="panel glass">
+        <h2>Area map</h2>
+        <div #areaMap class="area-map"></div>
+        @if (lateAlertCount() > 0) {
+          <div class="alert-banner">
+            ⚠️ Alert: {{ lateAlertCount() }} farmers are planting significantly later than the optimal window.
+            Consider scheduling a group extension session.
+          </div>
+        }
+      </section>
+
+      <!-- Local rules -->
+      <section class="panel glass">
+        <h2>Your local knowledge</h2>
+        <p class="sub muted">Feeds the model for every farmer in your area.</p>
+
+        <div class="rules-list">
+          @for (r of rules(); track r.text) {
+            <div class="rule-row">
+              <span class="rule-icon">{{ RULE_ICON[r.type] }}</span>
+              <span class="rule-text" [class.off]="!r.active">{{ r.text }}</span>
+              <button class="toggle interactive" [class.on]="r.active" (click)="toggleRule(r)" [attr.aria-label]="r.active ? 'Disable' : 'Enable'">
+                <span class="knob"></span>
+              </button>
+              <button class="del interactive" (click)="deleteRule(r)" aria-label="Delete">🗑️</button>
+            </div>
+          }
+        </div>
+
+        <div class="add-rule">
+          <textarea class="add-text interactive" rows="2" [value]="newRuleText()"
+                    (input)="newRuleText.set($any($event.target).value)"
+                    placeholder="Describe your local observation…"></textarea>
+          <div class="add-controls">
+            <select class="add-select interactive" [value]="newRuleType()" (change)="newRuleType.set($any($event.target).value)">
+              <option value="soil">Soil</option>
+              <option value="variety">Variety</option>
+              <option value="market">Market</option>
+              <option value="pest">Pest</option>
+              <option value="irrigation">Irrigation</option>
+            </select>
+            <button class="btn interactive" [disabled]="!newRuleText().trim()" (click)="addRule()">+ Add rule</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Season log -->
+      <section class="panel glass">
+        <div class="panel-head">
+          <h2>After harvest — what actually happened?</h2>
+          <button class="btn interactive" (click)="logModalOpen.set(true)">Log new season</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Farmer</th><th>Tried window?</th><th>Actual outcome</th><th>Model predicted</th><th>Agreement</th></tr>
+            </thead>
+            <tbody>
+              @for (row of log(); track $index) {
+                <tr>
+                  <td class="strong">{{ row.farmer }}</td>
+                  <td>{{ row.triedWindow ? 'Yes' : 'No' }}</td>
+                  <td>
+                    <span class="chip" [class.amber]="row.outcome !== 'success'">
+                      {{ row.outcome === 'success' ? '✓ Success' : row.outcome === 'heat-stressed' ? 'Heat stressed' : row.outcome === 'at-risk' ? 'At risk' : row.outcome }}
+                    </span>
+                  </td>
+                  <td class="muted">{{ row.modelSaid }}</td>
+                  <td>{{ agreement(row) ? '✅' : '⚠️' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Overlays -->
+  <app-review-drawer [farmer]="activeFarmer()" [open]="drawerOpen()"
+                     (approved)="approveFarmer($event)" (adjustment)="requestAdjustment()" (closed)="closeReview()"></app-review-drawer>
+
+  @if (logModalOpen()) {
+    <app-season-log-modal (logged)="addLog($event)" (cancel)="logModalOpen.set(false)"></app-season-log-modal>
+  }
+}

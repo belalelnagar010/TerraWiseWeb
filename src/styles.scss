@@ -209,6 +209,26 @@ h1, h2, h3, h4, .font-head { font-family: var(--font-head); }
   100% { box-shadow: 0 0 0 0 rgba(73, 224, 123, 0); }
 }
 
+/* ---------- Agronomist area-map markers + popups (injected outside scope) ---------- */
+.area-marker {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid #03060a; cursor: pointer;
+}
+.maplibregl-popup.area-popup-pop .maplibregl-popup-content,
+.area-popup {
+  font-family: var(--font-body);
+}
+.maplibregl-popup-content {
+  background: var(--surface-strong) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  font-size: 12.5px;
+  box-shadow: var(--glow-soft) !important;
+  backdrop-filter: blur(8px);
+}
+.maplibregl-popup-tip { border-top-color: var(--surface-strong) !important; border-bottom-color: var(--surface-strong) !important; }
+
 /* ---------- Entrance animation helper (GSAP sets opacity 0 first) ---------- */
 .will-enter { opacity: 0; }
 
