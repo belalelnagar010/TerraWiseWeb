@@ -13,8 +13,9 @@
       <input class="gate-input interactive enter-item" [value]="code()"
              (input)="code.set($any($event.target).value)"
              (keydown.enter)="submitCode()" placeholder="Agronomist code" />
-      <button class="btn gate-btn interactive enter-item" [disabled]="!code().trim()" (click)="submitCode()">
-        Access dashboard
+      @if (loginError()) { <p class="gate-error enter-item">{{ loginError() }}</p> }
+      <button class="btn gate-btn interactive enter-item" [disabled]="!code().trim() || loggingIn()" (click)="submitCode()">
+        {{ loggingIn() ? 'Signing in…' : 'Access dashboard' }}
       </button>
     </div>
   </div>
@@ -65,7 +66,7 @@
               <tr><th>Farmer</th><th>Crop</th><th>Suggested window</th><th>Usual date</th><th>Status</th><th>Action</th></tr>
             </thead>
             <tbody>
-              @for (f of farmers(); track f.name) {
+              @for (f of farmers(); track f.id) {
                 <tr>
                   <td class="strong">{{ f.name }}</td>
                   <td>{{ f.crop }}</td>
@@ -104,7 +105,7 @@
         <p class="sub muted">Feeds the model for every farmer in your area.</p>
 
         <div class="rules-list">
-          @for (r of rules(); track r.text) {
+          @for (r of rules(); track r.id ?? r.text) {
             <div class="rule-row">
               <span class="rule-icon">{{ RULE_ICON[r.type] }}</span>
               <span class="rule-text" [class.off]="!r.active">{{ r.text }}</span>
@@ -167,7 +168,7 @@
 
   <!-- Overlays -->
   <app-review-drawer [farmer]="activeFarmer()" [open]="drawerOpen()"
-                     (approved)="approveFarmer($event)" (adjustment)="requestAdjustment()" (closed)="closeReview()"></app-review-drawer>
+                     (approved)="approveFarmer($event)" (adjustment)="requestAdjustment($event)" (closed)="closeReview()"></app-review-drawer>
 
   @if (logModalOpen()) {
     <app-season-log-modal (logged)="addLog($event)" (cancel)="logModalOpen.set(false)"></app-season-log-modal>

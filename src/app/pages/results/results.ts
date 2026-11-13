@@ -177,28 +177,38 @@ export class ResultsComponent implements OnInit {
     });
   }
 
-  // ---- GDD mini chart (agronomist) ----
-  // Cumulative GDD points across Oct→Sep (shape only; backend supplies values).
-  readonly gddPoints = [0, 60, 140, 210, 290, 400, 560, 760, 980, 1180, 1320, 1400];
+  // ---- GDD mini chart (agronomist) — from live backend `gdd` block ----
+  readonly gdd = computed(() => this.result()?.gdd ?? null);
+
   readonly gddPath = computed(() => {
-    const max = 1400, W = 560, H = 150, pad = 4;
-    return this.gddPoints
-      .map((v, i) => {
-        const x = pad + (i / (this.gddPoints.length - 1)) * (W - pad * 2);
-        const y = H - pad - (v / max) * (H - pad * 2);
+    const g = this.gdd();
+    if (!g?.points?.length) return '';
+    const pts = g.points;
+    const max = Math.max(...pts.map((p) => p.cumulative), 1);
+    const W = 560, H = 150, pad = 4;
+    return pts
+      .map((p, i) => {
+        const x = pad + (i / Math.max(pts.length - 1, 1)) * (W - pad * 2);
+        const y = H - pad - (p.cumulative / max) * (H - pad * 2);
         return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
   });
-  readonly gddStages = [
-    { label: 'Emergence', idx: 1 },
-    { label: 'Tillering', idx: 3 },
-    { label: 'Flowering', idx: 6 },
-    { label: 'Grain-fill', idx: 8 },
-  ];
+
+  /** Stage markers positioned by month → Oct→Sep column index. */
+  readonly gddStages = computed(() => {
+    const g = this.gdd();
+    if (!g) return [];
+    return g.stages
+      .map((s) => ({ label: s.label, x: this.gddX(DISPLAY_MONTHS.indexOf(s.month)) }))
+      .filter((s) => s.x >= 0);
+  });
+
   gddX(idx: number): number {
+    const n = this.gdd()?.points.length ?? 12;
     const W = 560, pad = 4;
-    return pad + (idx / (this.gddPoints.length - 1)) * (W - pad * 2);
+    if (idx < 0) return -1;
+    return pad + (idx / Math.max(n - 1, 1)) * (W - pad * 2);
   }
 
   readonly confidenceLabel = computed(() => {
@@ -211,6 +221,28 @@ export class ResultsComponent implements OnInit {
     "Your field's drainage characteristics",
     'Local pest pressure in your area',
   ];
+
+  // ---- PDF export ----
+  readonly downloading = signal(false);
+  readonly canPdf = computed(() => !!this.analysis.lastRequest());
+
+  downloadPdf(): void {
+    const req = this.analysis.lastRequest();
+    if (!req || this.downloading()) return;
+    this.downloading.set(true);
+    this.analysis.pdf(req).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'terrawise-report.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+        this.downloading.set(false);
+      },
+      error: () => this.downloading.set(false),
+    });
+  }
 
   // ---- nav ----
   toAgronomist(): void {

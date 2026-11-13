@@ -36,6 +36,15 @@ export type CalendarStatus = 'out' | 'safe' | 'optimal' | 'flowering' | 'heat' |
 export type IrrigationNeed = 'none' | 'low' | 'high';
 export type Confidence = 'high' | 'medium' | 'low';
 
+export interface GddPoint { month: number; cumulative: number; }
+export interface GddStage { label: string; month: number; }
+export interface Gdd {
+  unit: string;
+  base: number;
+  points: GddPoint[];   // cumulative GDD, ordered Oct→Sep (12 points)
+  stages: GddStage[];   // vertical stage markers
+}
+
 export interface AnalysisResponse {
   window: {
     start: string;        // ISO date
@@ -47,4 +56,5 @@ export interface AnalysisResponse {
   irrigation: Array<{ month: number; need: IrrigationNeed }>;
   timeMachine: Array<{ year: number; windowStartDay: number }>;
   evidence: { why: string; nasaSource: string; confidence: Confidence };
+  gdd?: Gdd;            // present when the backend supplies the GDD chart
 }

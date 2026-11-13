@@ -93,7 +93,7 @@ export class ReviewDrawerComponent implements AfterViewInit, OnChanges {
   @Input() farmer: FarmerRow | null = null;
   @Input() open = false;
   @Output() approved = new EventEmitter<ReviewResult>();
-  @Output() adjustment = new EventEmitter<void>();
+  @Output() adjustment = new EventEmitter<ReviewResult>();
   @Output() closed = new EventEmitter<void>();
 
   @ViewChild('panel', { static: true }) panel!: ElementRef<HTMLElement>;
@@ -129,6 +129,8 @@ export class ReviewDrawerComponent implements AfterViewInit, OnChanges {
   onApprove(): void {
     this.approved.emit({ note: this.note(), testFirst: this.testFirst() });
   }
-  onAdjust(): void { this.adjustment.emit(); }
+  onAdjust(): void {
+    this.adjustment.emit({ note: this.note(), testFirst: this.testFirst() });
+  }
   requestClose(): void { this.closed.emit(); }
 }

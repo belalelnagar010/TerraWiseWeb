@@ -122,22 +122,22 @@
             </div>
           </div>
 
-          @if (view() === 'agronomist') {
+          @if (view() === 'agronomist' && gdd(); as g) {
             <div class="gdd-panel">
               <h4>GDD accumulation · growing degree days</h4>
               <svg viewBox="0 0 560 170" class="gdd-chart" preserveAspectRatio="none">
                 <line x1="4" y1="150" x2="556" y2="150" stroke="rgba(159,179,166,0.3)" />
-                @for (s of gddStages; track s.label) {
-                  <line [attr.x1]="gddX(s.idx)" y1="12" [attr.x2]="gddX(s.idx)" y2="150"
+                @for (s of gddStages(); track s.label) {
+                  <line [attr.x1]="s.x" y1="12" [attr.x2]="s.x" y2="150"
                         stroke="rgba(242,179,71,0.45)" stroke-dasharray="3 3" />
-                  <text [attr.x]="gddX(s.idx)" y="9" class="stage-label">{{ s.label }}</text>
+                  <text [attr.x]="s.x" y="9" class="stage-label">{{ s.label }}</text>
                 }
                 <path [attr.d]="gddPath()" fill="none" stroke="#49E07B" stroke-width="2.5" />
                 @for (lbl of ['Oct','Dec','Feb','Apr','Jun','Aug']; track lbl; let i = $index) {
                   <text [attr.x]="gddX(i * 2)" y="166" class="axis-label">{{ lbl }}</text>
                 }
               </svg>
-              <span class="chip source small"><span class="sat">🛰️</span> NASA POWER T2M · GDD base 0 °C</span>
+              <span class="chip source small"><span class="sat">🛰️</span> NASA POWER T2M · GDD base {{ g.base }} °C</span>
             </div>
           }
         </section>
@@ -146,7 +146,9 @@
       <!-- CTA -->
       <div class="cta-row enter-item">
         <button class="btn btn-ghost interactive" (click)="toAgronomist()">Send to agronomist for review</button>
-        <button class="btn interactive" disabled title="Available after agronomist review">Download as PDF</button>
+        <button class="btn interactive" [disabled]="!canPdf() || downloading()" (click)="downloadPdf()">
+          {{ downloading() ? 'Preparing PDF…' : 'Download as PDF' }}
+        </button>
       </div>
       <p class="disclaimer muted">
         This is timing guidance only. Consult your agronomist and local field conditions before planting.

@@ -15,6 +15,7 @@
 }
 .gate-input:focus { outline: none; border-color: var(--border-strong); box-shadow: var(--glow-soft); }
 .gate-btn { width: 100%; padding: 14px; }
+.gate-error { color: var(--danger); font-size: 13px; margin: 0; }
 
 /* ---------- Dashboard shell ---------- */
 .dim-overlay { position: fixed; inset: 0; background: rgba(3,6,10,0.55); z-index: -1; pointer-events: none; }

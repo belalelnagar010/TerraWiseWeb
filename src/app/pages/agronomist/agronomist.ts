@@ -18,11 +18,18 @@ import { buildGraticule } from '../../core/geo.util';
 import { EnterDirective } from '../../shared/enter.directive';
 import { ReviewDrawerComponent, ReviewResult } from './review-drawer';
 import { SeasonLogModalComponent } from './season-log-modal';
-import { FarmerRow, LogRow, Rule, RuleType, RULE_ICON } from './agronomist.models';
+import { AgronomistService } from './agronomist.service';
+import {
+  AreaMarker,
+  FarmerRow,
+  Kpis,
+  LogRow,
+  Rule,
+  RuleType,
+  RULE_ICON,
+} from './agronomist.models';
 
-interface AreaMarker { lng: number; lat: number; name: string; status: 'ok' | 'near' | 'late'; }
-
-const STORAGE_KEY = 'tw_agro_code';
+const STORAGE_KEY = 'tw_agro_token';
 
 @Component({
   selector: 'app-agronomist',
@@ -35,45 +42,38 @@ export class AgronomistComponent implements AfterViewInit, OnDestroy {
   readonly field = inject(FieldStateService);
   private readonly router = inject(Router);
   private readonly zone = inject(NgZone);
+  private readonly agro = inject(AgronomistService);
 
   @ViewChild('areaMap') areaMapRef?: ElementRef<HTMLDivElement>;
 
   readonly RULE_ICON = RULE_ICON;
 
   // ---- gate ----
-  readonly authed = signal(this.readStoredCode());
+  readonly authed = signal(this.hasToken());
   readonly code = signal('');
+  readonly loggingIn = signal(false);
+  readonly loginError = signal<string | null>(null);
 
-  // ---- data ----
-  readonly farmers = signal<FarmerRow[]>([
-    { name: 'Ahmed Hassan', crop: 'Wheat', window: 'Nov 16–29', usual: 'Dec 1', status: 'late', reviewed: false },
-    { name: 'Sara Mohamed', crop: 'Beans', window: 'Nov 5–18', usual: 'Nov 10', status: 'ok', reviewed: false },
-    { name: 'Khaled Ali', crop: 'Barley', window: 'Nov 20–Dec 3', usual: 'Dec 15', status: 'late', reviewed: false },
-    { name: 'Fatma Ibrahim', crop: 'Wheat', window: 'Nov 16–29', usual: 'Nov 18', status: 'ok', reviewed: true },
-    { name: 'Youssef Omar', crop: 'Maize', window: 'Apr 10–23', usual: 'Apr 5', status: 'ok', reviewed: false },
-  ]);
-
-  readonly rules = signal<Rule[]>([
-    { text: 'Slow-draining soil in this area — delay planting start by 5 days', type: 'soil', active: true },
-    { text: 'Local wheat variety matures 8 days faster than standard tables', type: 'variety', active: true },
-    { text: 'Fall armyworm pressure peaks late October — plant after Oct 28', type: 'pest', active: false },
-  ]);
-
-  readonly log = signal<LogRow[]>([
-    { farmer: 'Ahmed Hassan', triedWindow: true, outcome: 'success', modelSaid: 'success' },
-    { farmer: 'Sara Mohamed', triedWindow: false, outcome: 'heat-stressed', modelSaid: 'at-risk' },
-    { farmer: 'Khaled Ali', triedWindow: true, outcome: 'success', modelSaid: 'success' },
-  ]);
+  // ---- data (loaded from the API) ----
+  readonly farmers = signal<FarmerRow[]>([]);
+  readonly rules = signal<Rule[]>([]);
+  readonly log = signal<LogRow[]>([]);
+  readonly areaMarkers = signal<AreaMarker[]>([]);
+  readonly kpiData = signal<Kpis | null>(null);
 
   // ---- derived ----
   readonly unreviewedCount = computed(() => this.farmers().filter((f) => !f.reviewed).length);
   readonly rulesActive = computed(() => this.rules().filter((r) => r.active).length);
-  readonly kpis = computed(() => [
-    { label: 'Awaiting review', value: this.unreviewedCount(), amber: false },
-    { label: 'Farmers in area', value: 86, amber: false },
-    { label: 'Planting late vs window', value: this.farmers().filter((f) => f.status === 'late').length + 7, amber: true },
-    { label: 'Local rules active', value: this.rulesActive(), amber: false },
-  ]);
+  readonly lateAlertCount = computed(() => this.areaMarkers().filter((m) => m.status === 'late').length);
+  readonly kpis = computed(() => {
+    const k = this.kpiData();
+    return [
+      { label: 'Awaiting review', value: this.unreviewedCount(), amber: false },
+      { label: 'Farmers in area', value: k?.farmersInArea ?? this.areaMarkers().length, amber: false },
+      { label: 'Planting late vs window', value: k?.plantingLateVsWindow ?? this.lateAlertCount(), amber: true },
+      { label: 'Local rules active', value: this.rulesActive(), amber: false },
+    ];
+  });
 
   // ---- review drawer ----
   readonly activeFarmer = signal<FarmerRow | null>(null);
@@ -89,12 +89,11 @@ export class AgronomistComponent implements AfterViewInit, OnDestroy {
   // ---- map ----
   private map?: maplibregl.Map;
   private markers: maplibregl.Marker[] = [];
-  readonly areaMarkers = signal<AreaMarker[]>([]);
-  readonly lateAlertCount = computed(() => this.areaMarkers().filter((m) => m.status === 'late').length);
+  private mapLoaded = false;
 
   // ------------------------------------------------------------------
   ngAfterViewInit(): void {
-    if (this.authed()) this.scheduleMap();
+    if (this.authed()) this.afterAuth();
   }
 
   ngOnDestroy(): void {
@@ -105,14 +104,43 @@ export class AgronomistComponent implements AfterViewInit, OnDestroy {
   // ---- gate ----
   submitCode(): void {
     const c = this.code().trim();
-    if (!c) return;
-    try { sessionStorage.setItem(STORAGE_KEY, c); } catch { /* ignore */ }
-    this.authed.set(true);
-    this.scheduleMap();
+    if (!c || this.loggingIn()) return;
+    this.loggingIn.set(true);
+    this.loginError.set(null);
+    this.agro.login(c).subscribe({
+      next: (res) => {
+        try { sessionStorage.setItem(STORAGE_KEY, res.token); } catch { /* ignore */ }
+        this.loggingIn.set(false);
+        this.authed.set(true);
+        this.afterAuth();
+      },
+      error: () => {
+        this.loggingIn.set(false);
+        this.loginError.set('Could not sign in — check the backend is running.');
+      },
+    });
   }
 
-  private readStoredCode(): boolean {
+  private hasToken(): boolean {
     try { return !!sessionStorage.getItem(STORAGE_KEY); } catch { return false; }
+  }
+
+  private afterAuth(): void {
+    this.loadDashboard();
+    setTimeout(() => this.zone.runOutsideAngular(() => this.initMap()), 50);
+  }
+
+  private loadDashboard(): void {
+    this.agro.kpis().subscribe({ next: (k) => this.kpiData.set(k), error: () => {} });
+    this.agro.requests().subscribe({ next: (r) => this.farmers.set(r), error: () => {} });
+    this.agro.rules().subscribe({ next: (r) => this.rules.set(r), error: () => {} });
+    this.agro.seasonLog().subscribe({ next: (l) => this.log.set(l), error: () => {} });
+    const lat = this.field.lat() ?? 30.6042;
+    const lon = this.field.lon() ?? 31.2358;
+    this.agro.area(lat, lon, 25).subscribe({
+      next: (m) => { this.areaMarkers.set(m); this.plotMarkers(); },
+      error: () => {},
+    });
   }
 
   // ---- review ----
@@ -121,28 +149,49 @@ export class AgronomistComponent implements AfterViewInit, OnDestroy {
     this.drawerOpen.set(true);
   }
   closeReview(): void { this.drawerOpen.set(false); }
-  approveFarmer(_r: ReviewResult): void {
+
+  approveFarmer(r: ReviewResult): void { this.submitReview('approve', r); }
+  requestAdjustment(r: ReviewResult): void { this.submitReview('adjust', r); }
+
+  private submitReview(decision: 'approve' | 'adjust', r: ReviewResult): void {
     const target = this.activeFarmer();
-    if (target) {
-      this.farmers.update((list) => list.map((f) => (f === target ? { ...f, reviewed: true } : f)));
-    }
-    this.drawerOpen.set(false);
+    if (!target) { this.drawerOpen.set(false); return; }
+    this.agro.review(target.id, { decision, note: r.note, testFirst: r.testFirst }).subscribe({
+      next: () => {
+        if (decision === 'approve') {
+          this.farmers.update((list) => list.map((f) => (f === target ? { ...f, reviewed: true } : f)));
+        }
+        this.drawerOpen.set(false);
+      },
+      error: () => this.drawerOpen.set(false),
+    });
   }
-  requestAdjustment(): void { this.drawerOpen.set(false); }
 
   // ---- rules ----
   toggleRule(rule: Rule): void {
-    this.rules.update((list) => list.map((r) => (r === rule ? { ...r, active: !r.active } : r)));
+    const next = !rule.active;
+    const apply = () => this.rules.update((list) => list.map((r) => (r === rule ? { ...r, active: next } : r)));
+    if (rule.id) this.agro.patchRule(rule.id, next).subscribe({ next: apply, error: () => {} });
+    else apply();
   }
   deleteRule(rule: Rule): void {
-    this.rules.update((list) => list.filter((r) => r !== rule));
+    const apply = () => this.rules.update((list) => list.filter((r) => r !== rule));
+    if (rule.id) this.agro.deleteRule(rule.id).subscribe({ next: apply, error: () => {} });
+    else apply();
   }
   addRule(): void {
     const text = this.newRuleText().trim();
     if (!text) return;
-    this.rules.update((list) => [...list, { text, type: this.newRuleType(), active: true }]);
-    this.newRuleText.set('');
-    // Slide-in the newest row.
+    this.agro.addRule(text, this.newRuleType()).subscribe({
+      next: (rule) => {
+        this.rules.update((list) => [...list, rule]);
+        this.newRuleText.set('');
+        this.animateLastRule();
+      },
+      error: () => {},
+    });
+  }
+  private animateLastRule(): void {
     queueMicrotask(() => {
       const rows = document.querySelectorAll('.rule-row');
       const last = rows[rows.length - 1] as HTMLElement | undefined;
@@ -152,22 +201,19 @@ export class AgronomistComponent implements AfterViewInit, OnDestroy {
 
   // ---- season log ----
   addLog(row: LogRow): void {
-    this.log.update((list) => [...list, row]);
-    this.logModalOpen.set(false);
+    this.agro.addLog({ farmer: row.farmer, triedWindow: row.triedWindow, outcome: row.outcome }).subscribe({
+      next: (saved) => { this.log.update((list) => [...list, saved]); this.logModalOpen.set(false); },
+      error: () => this.logModalOpen.set(false),
+    });
   }
   agreement(row: LogRow): boolean {
-    const normalize = (o: string) => (o === 'success' ? 'success' : 'risk');
-    return normalize(row.outcome) === normalize(row.modelSaid);
+    const norm = (o: string) => (o === 'success' ? 'success' : 'risk');
+    return norm(row.outcome) === norm(row.modelSaid);
   }
 
   toFarmerView(): void { this.router.navigate(['/results']); }
 
   // ---- map ----
-  private scheduleMap(): void {
-    // Wait for the dashboard DOM (and the map container) to render.
-    setTimeout(() => this.zone.runOutsideAngular(() => this.initMap()), 50);
-  }
-
   private initMap(): void {
     if (this.map || !this.areaMapRef) return;
     const lat = this.field.lat() ?? 30.6042;
@@ -197,31 +243,27 @@ export class AgronomistComponent implements AfterViewInit, OnDestroy {
       pitch: 35,
     });
 
-    const statuses: AreaMarker['status'][] = ['ok', 'ok', 'ok', 'near', 'near', 'late', 'ok', 'late', 'ok'];
-    const names = ['Ahmed', 'Sara', 'Khaled', 'Fatma', 'Youssef', 'Mona', 'Tarek', 'Hoda', 'Nabil'];
-    const generated: AreaMarker[] = statuses.map((status, i) => ({
-      lng: lon + (Math.random() - 0.5) * 0.36,
-      lat: lat + (Math.random() - 0.5) * 0.36,
-      name: names[i],
-      status,
-    }));
-    this.zone.run(() => this.areaMarkers.set(generated));
-
-    this.map.on('load', () => {
-      const color = { ok: '#49E07B', near: '#F2B347', late: '#E05449' };
-      for (const m of generated) {
-        const el = document.createElement('div');
-        el.className = 'area-marker';
-        el.style.background = color[m.status];
-        el.style.boxShadow = `0 0 12px ${color[m.status]}`;
-        const popup = new maplibregl.Popup({ offset: 14, closeButton: false }).setHTML(
-          `<div class="area-popup"><strong>${m.name}</strong><br>${
-            m.status === 'ok' ? 'Within window' : m.status === 'near' ? 'Near boundary' : 'Planting late'
-          }</div>`,
-        );
-        this.markers.push(new maplibregl.Marker({ element: el }).setLngLat([m.lng, m.lat]).setPopup(popup).addTo(this.map!));
-      }
-    });
+    this.map.on('load', () => { this.mapLoaded = true; this.plotMarkers(); });
     this.map.on('error', (e) => console.warn('Area map:', e.error?.message ?? e));
+  }
+
+  /** Render the current area markers on the map (idempotent). */
+  private plotMarkers(): void {
+    if (!this.map || !this.mapLoaded) return;
+    this.markers.forEach((m) => m.remove());
+    this.markers = [];
+    const color = { ok: '#49E07B', near: '#F2B347', late: '#E05449' } as const;
+    for (const m of this.areaMarkers()) {
+      const el = document.createElement('div');
+      el.className = 'area-marker';
+      el.style.background = color[m.status];
+      el.style.boxShadow = `0 0 12px ${color[m.status]}`;
+      const popup = new maplibregl.Popup({ offset: 14, closeButton: false }).setHTML(
+        `<div class="area-popup"><strong>${m.name}</strong><br>${
+          m.status === 'ok' ? 'Within window' : m.status === 'near' ? 'Near boundary' : 'Planting late'
+        }</div>`,
+      );
+      this.markers.push(new maplibregl.Marker({ element: el }).setLngLat([m.lon, m.lat]).setPopup(popup).addTo(this.map!));
+    }
   }
 }
