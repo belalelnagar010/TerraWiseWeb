@@ -1,0 +1,79 @@
+<div class="field-page">
+  <!-- The map IS the page -->
+  <div #mapContainer class="map-root"></div>
+  <div class="map-scanlines"></div>
+
+  <!-- Top bar -->
+  <header class="topbar glass" appParallax [parallaxStrength]="3">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22">
+          <path d="M12 21c0-5 2.5-8.5 7-10-1 5-2.5 8.5-7 10zM12 21c0-5-2.5-8.5-7-10 1 5 2.5 8.5 7 10z"
+                fill="#49E07B"/>
+          <path d="M12 22V10" stroke="#49E07B" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">Terra<span>Wise</span></span>
+    </div>
+
+    <form class="search" (submit)="$event.preventDefault(); onSearch(searchInput.value)">
+      <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input #searchInput class="interactive" type="text" placeholder="Search a place or drop a pin…"
+             autocomplete="off" spellcheck="false" />
+      @if (searching()) { <span class="spinner" aria-label="searching"></span> }
+      @if (searchError()) { <span class="search-err">{{ searchError() }}</span> }
+    </form>
+
+    <div class="nasa-badge chip amber interactive" title="NASA GIBS imagery available">
+      <span class="pulse-dot"></span> NASA GIBS
+    </div>
+  </header>
+
+  <!-- Left toolbar -->
+  <nav class="toolbar glass" appParallax [parallaxStrength]="2">
+    <button class="tool interactive" [class.active]="field.selectionMode() === 'pin' && !drawing()"
+            (click)="setMode('pin')" title="Drop pin">📍</button>
+    <button class="tool interactive" [class.active]="drawing()"
+            (click)="setMode('draw')" title="Draw boundary">✏️</button>
+    <button class="tool interactive" (click)="toggleLayer()"
+            [class.active]="layerMode() !== 'grid'" title="Toggle layer">🗺️</button>
+    <button class="tool interactive" (click)="myLocation()" title="My location">🧭</button>
+  </nav>
+
+  <!-- Toast -->
+  @if (toast()) {
+    <div class="toast glass">{{ toast() }}</div>
+  }
+
+  <!-- Bottom panel -->
+  <section class="bottom-panel glass" appEnter>
+    @if (!field.hasField()) {
+      <div class="panel-empty">
+        <span class="hint-pulse" aria-hidden="true"></span>
+        <p class="panel-empty-text">Tap the map to drop your field pin</p>
+        <p class="muted panel-empty-sub">…or use <strong>✏️ Draw boundary</strong> to trace your field</p>
+      </div>
+    } @else {
+      <div class="panel-full">
+        <div class="coord-block">
+          <div class="coord">{{ field.coordLabel() }}</div>
+          <div class="badges">
+            <span class="chip">NASA POWER cell ready</span>
+            <span class="chip">MODIS tile ready</span>
+            <span class="chip">SoilGrids ready</span>
+            @if (field.areaHectares() !== null) {
+              <span class="chip amber">{{ field.areaHectares()!.toFixed(1) }} ha</span>
+            }
+          </div>
+        </div>
+        <div class="panel-actions">
+          <button class="btn btn-ghost interactive" (click)="startDraw()">✏️ Draw field boundary</button>
+          <button class="btn interactive" (click)="computeWindow()">Compute window →</button>
+        </div>
+      </div>
+    }
+  </section>
+</div>

@@ -1,0 +1,71 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.space-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 800px at 75% 15%, rgba(16, 40, 28, 0.55), transparent 60%),
+    radial-gradient(1000px 700px at 10% 85%, rgba(30, 24, 10, 0.5), transparent 60%),
+    #03060a;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.nebula {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.55;
+  animation: drift 26s ease-in-out infinite;
+}
+.nebula-green {
+  width: 46vw; height: 46vw;
+  top: -10vh; left: -8vw;
+  background: radial-gradient(circle, rgba(73, 224, 123, 0.4), transparent 65%);
+}
+.nebula-amber {
+  width: 40vw; height: 40vw;
+  bottom: -14vh; right: -6vw;
+  background: radial-gradient(circle, rgba(242, 179, 71, 0.3), transparent 65%);
+  animation-delay: -12s;
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(3vw, 4vh) scale(1.12); }
+}
+
+.satellite {
+  position: absolute;
+  top: 18%;
+  left: 14%;
+  filter: drop-shadow(0 0 10px rgba(73, 224, 123, 0.4));
+  animation: float-sat 9s ease-in-out infinite;
+}
+@keyframes float-sat {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-22px) rotate(4deg); }
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(130% 110% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+@media (max-width: 720px) {
+  .satellite { top: 10%; left: 70%; }
+}

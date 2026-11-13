@@ -1,0 +1,130 @@
+<div class="setup-scroll">
+  <div class="setup-container">
+
+    <header class="setup-head" appParallax [parallaxStrength]="3">
+      <h1 class="gradient-text">Configure your field</h1>
+      <p class="muted">Dial in your crop and conditions — we'll match them to 45 years of NASA climate data.</p>
+    </header>
+
+    <!-- Field summary -->
+    <div class="summary glass enter-item" appEnter>
+      <div class="summary-left">
+        <span class="summary-pin">📍</span>
+        <div>
+          <div class="summary-coord">{{ field.hasField() ? field.coordLabel() : 'No field selected' }}</div>
+          <div class="muted summary-meta">
+            @if (field.areaHectares() !== null) {
+              Boundary · {{ field.areaHectares()!.toFixed(1) }} ha
+            } @else if (field.hasField()) {
+              Single-point field
+            } @else {
+              Pick a field on the map first
+            }
+          </div>
+        </div>
+      </div>
+      <a class="edit-link interactive" routerLink="/field">Edit field</a>
+    </div>
+
+    <!-- SECTION 1 — Crop -->
+    <section class="block">
+      <h2 class="block-label">What do you grow?</h2>
+      <div class="crop-grid" appEnter [enterStagger]="0.05">
+        @for (c of crops; track c.id) {
+          <button class="crop-card enter-item interactive" [class.selected]="field.crop() === c.id"
+                  (click)="selectCrop(c.id)">
+            <span class="crop-icon">{{ c.icon }}</span>
+            <span class="crop-name">{{ c.name }}</span>
+            <span class="season-tag" [attr.data-season]="c.season">{{ c.season }}</span>
+            @if (field.crop() === c.id) { <span class="check">✓</span> }
+          </button>
+        }
+      </div>
+    </section>
+
+    <!-- SECTION 2 — Irrigation -->
+    <section class="block">
+      <h2 class="block-label">How is your field watered?</h2>
+      <div class="pill-group">
+        @for (o of irrigationOptions; track o.id) {
+          <button class="pill interactive" [class.selected]="field.irrigation() === o.id"
+                  (click)="selectIrrigation(o.id)">
+            <span>{{ o.icon }}</span> {{ o.label }}
+          </button>
+        }
+      </div>
+    </section>
+
+    <!-- SECTION 3 — Soil -->
+    <section class="block">
+      <h2 class="block-label">Soil type <span class="muted optional">(optional — improves accuracy)</span></h2>
+      <div class="soil-grid">
+        @for (s of soilOptions; track s.id) {
+          <button class="soil-card interactive" [class.selected]="field.soilType() === s.id"
+                  (click)="selectSoil(s.id)">
+            <span class="soil-icon">{{ s.icon }}</span>
+            <span class="soil-name">{{ s.label }}</span>
+            <span class="muted soil-note">{{ s.note }}</span>
+          </button>
+        }
+      </div>
+      <p class="muted hint">If unsure, leave blank — we'll use SoilGrids satellite data.</p>
+    </section>
+
+    <!-- SECTION 4 — Planting date -->
+    <section class="block">
+      <h2 class="block-label">When do you usually plant?</h2>
+      <div class="date-row">
+        <label class="field-select">
+          <span class="muted">Month</span>
+          <select class="interactive" (change)="setMonth($any($event.target).value)">
+            <option value="">Select month</option>
+            @for (m of months; track $index) {
+              <option [value]="$index + 1" [selected]="field.usualPlantMonth() === $index + 1">{{ m }}</option>
+            }
+          </select>
+        </label>
+        <div class="field-select">
+          <span class="muted">Week</span>
+          <div class="pill-group tight">
+            @for (w of weeks; track w.id) {
+              <button class="pill small interactive" [class.selected]="field.usualPlantWeek() === w.id"
+                      (click)="setWeek(w.id)">{{ w.label }}</button>
+            }
+          </div>
+        </div>
+      </div>
+      <p class="muted hint">We'll compare your date with the optimal window.</p>
+    </section>
+
+    <!-- SECTION 5 — Priorities -->
+    <section class="block">
+      <h2 class="block-label">What matters most to you?</h2>
+      <div class="sliders">
+        @for (s of sliderKeys; track s.key) {
+          <div class="slider-row">
+            <span class="slider-label">{{ s.icon }} {{ s.label }}</span>
+            <input class="interactive slider" type="range" min="0" max="5" step="1"
+                   [value]="field.priorities()[s.key]"
+                   (input)="setPriority(s.key, $any($event.target).value)" />
+            <span class="slider-value">{{ field.priorities()[s.key] }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <button class="btn cta interactive" [disabled]="!canSubmit || loading()" (click)="findWindow()">
+      @if (loading()) {
+        <span class="spinner"></span> Analyzing 45 years of NASA data…
+      } @else {
+        Find my planting window →
+      }
+    </button>
+    @if (!canSubmit && !loading()) {
+      <p class="muted cta-hint">Pick a field, a crop and an irrigation method to continue.</p>
+    }
+
+    <div class="setup-foot muted">TerraWise · NASA Space Apps 2026</div>
+  </div>
+</div>
